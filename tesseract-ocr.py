@@ -59,7 +59,6 @@ def get_json_details(image_path, directory):
             formatted_image_name = image_file_name
         # Adjust extension to match JSON "main_image_url"
         formatted_image_name = formatted_image_name.rsplit('.', 1)[0] + '.jpg'
-        print("AAA debug:", formatted_image_name)
         image_url_key = "main_image_url"
     elif 'berlin-mitte/' in image_path:
         # For 'berlin-mitte/' dataset, use the image filename as-is to match JSON "imageURL"
