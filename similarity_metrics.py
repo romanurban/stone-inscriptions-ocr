@@ -3,7 +3,7 @@ import unicodedata
 
 def normalize_text(text):
     """
-    Normalize text by removing diacritics from characters and handling special cases.
+    Normalize text by removing diacritics from characters, removing numbers and handling special cases.
     This includes converting German umlauts to their base letters and 'ß' to 'ss'.
     """
     # Specific replacement for ß to 'ss' before normalization
@@ -11,7 +11,7 @@ def normalize_text(text):
     
     # Decompose the remaining characters and remove diacritic marks
     normalized = unicodedata.normalize('NFD', text)
-    return ''.join(ch for ch in normalized if unicodedata.category(ch) != 'Mn')
+    return ''.join(ch for ch in normalized if unicodedata.category(ch) != 'Mn' and not ch.isdigit())
 
 def basic_similarity_score(ocr_text, true_text):
     """

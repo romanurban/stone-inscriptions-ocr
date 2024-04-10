@@ -15,32 +15,38 @@ def process_directory(directory):
     :param default_lang: Default OCR language.
     """
     lang = DEFAULT_LANGUAGE
+    print("Starting directory processing...")
+    print("-" * 60)
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS):
                 image_path = os.path.join(root, file)
                 true_text = ""  # Default value if no JSON details are found or if an error occurs
-                print(image_path)
+                print("\nProcessing image:", image_path)
                 json_details = get_json_details(image_path, root)
                 if json_details:
                     if 'timenote' in image_path:
                         lang = extract_lang(json_details)
                     else: 
                         lang = MITTE_DS_LANG_CODE
-                    print(f"Found JSON details for {file}: {json_details}")
+                    print(f"  > Found JSON details for {file}")
                     # Extract true text using the image path to determine dataset type
                     true_text = get_true_text(json_details, image_path)
-                    print(f"True text for {file}: {true_text}")
+                    print(f"  > True text: {true_text}")
                 else:
-                    print(f"No JSON details found for {file}")
+                    print(f"  > No JSON details found for {file}")
                 ocr_text = run_tesseract_ocr(image_path, lang)
                 if ocr_text:
-                    print(f"OCR text for {file}: {ocr_text}...")
+                    print(f"  > OCR text: {ocr_text[:50]}...")
+                else:
+                    print("  > OCR text: [No text detected]")
 
                 match_score = basic_similarity_score(ocr_text, true_text)
-                print(f"Basic similarity score for {file}: {match_score}")
+                print(f"  > Similarity score: {match_score}")
+    print("-" * 60)
+    print("Directory processing completed.")
 
 if __name__ == "__main__":
-    dataset_directory = "dataset/timenote/test"
-    #dataset_directory = "dataset/berlin-mitte/" 
+    #dataset_directory = "dataset/timenote/test"
+    dataset_directory = "dataset/berlin-mitte/" 
     process_directory(dataset_directory)
