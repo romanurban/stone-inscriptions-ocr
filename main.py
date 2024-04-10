@@ -1,27 +1,7 @@
 import os
 import json
-import cv2
-import pytesseract
-from pytesseract import Output
-
-def run_ocr_on_image(image_path, lang='lav'):
-    """
-    Runs OCR on an image and returns the extracted text.
-    :param image_path: Path to the image file.
-    :param lang: Language code for Tesseract OCR (default is English).
-    :return: Extracted text or None if an error occurs.
-    """
-    try:
-        blacklist_chars = '0123456789.,/\/()[]}{#$%^&*!@~`-_=+<>?;:|'
-        blacklist_letters_lv = 'QWXYqwxy'
-        # blacklist specific for LV and DE, ru and pl should be added
-        blacklist_lv = blacklist_chars + blacklist_letters_lv
-        config = f'--psm 3 --oem 3 -c tessedit_char_blacklist={blacklist_lv}'
-        text = pytesseract.image_to_string(cv2.imread(image_path, cv2.IMREAD_UNCHANGED), lang=lang, config=config)
-        return text.strip()
-    except Exception as e:
-        print(f"Failed to process image {image_path}: {e}")
-        return None
+from similarity_metrics import basic_similarity_score
+from tesseract_ocr import run_tesseract_ocr
     
 def get_true_text(json_item, image_path):
     """
@@ -94,41 +74,6 @@ def extract_lang(item):
     
 import string
 
-def basic_similarity_score(ocr_text, true_text):
-    """
-    Compares OCR text with true text in a naive way by checking the proportion
-    of matching words, disregarding the order and context.
-    
-    :param ocr_text: The text extracted from OCR.
-    :param true_text: The actual text from the dataset.
-    :return: A simple match score as a float between 0 and 1.
-    """
-    # Normalize texts: lowercase and remove punctuation
-    translator = str.maketrans('', '', string.punctuation)
-    norm_ocr_text = ocr_text.lower().translate(translator)
-    norm_true_text = true_text.lower().translate(translator)
-    
-    # Tokenize texts into sets of words to remove duplicates
-    ocr_words = set(norm_ocr_text.split())
-    true_words = set(norm_true_text.split())
-    
-    # Avoid division by zero if true_text is empty
-    if not true_words:
-        return "0.00000"
-    
-    # Calculate match score
-    match_count = len(ocr_words.intersection(true_words))
-    total_true_words = len(true_words)
-    
-    # Handle case where OCR text is empty
-    if total_true_words == 0 or len(ocr_text.strip()) == 0:
-        return "0.00000"
-
-    match_score = match_count / total_true_words
-    formatted_score = "{:.5f}".format(match_score)
-    return formatted_score
-
-
 def process_directory(directory):
     """
     Walks through the given directory, performing OCR on each image file,
@@ -155,7 +100,7 @@ def process_directory(directory):
                     print(f"True text for {file}: {true_text}")
                 else:
                     print(f"No JSON details found for {file}")
-                ocr_text = run_ocr_on_image(image_path, lang)
+                ocr_text = run_tesseract_ocr(image_path, lang)
                 if ocr_text:
                     print(f"OCR text for {file}: {ocr_text}...")
 
