@@ -1,4 +1,4 @@
-from similarity_metrics import basic_similarity_score
+from similarity_metrics import basic_similarity_score, cosine_similarity_tfidf_score, jaccard_similarity_score, levenshtein_similarity_score, ngram_similarity_score
 from tesseract_ocr import run_tesseract_ocr
 from dataset_helper import get_true_text, get_json_details, extract_lang
 import os
@@ -37,16 +37,31 @@ def process_directory(directory):
                     print(f"  > No JSON details found for {file}")
                 ocr_text = run_tesseract_ocr(image_path, lang)
                 if ocr_text:
-                    print(f"  > OCR text: {ocr_text[:50]}...")
+                    #print(f"  > OCR text: {ocr_text[:50]}...")
+                    print(f"  > OCR text: {ocr_text}...")
                 else:
                     print("  > OCR text: [No text detected]")
 
-                match_score = basic_similarity_score(ocr_text, true_text)
-                print(f"  > Similarity score: {match_score}")
+                similarity_score = basic_similarity_score(ocr_text, true_text)
+                print(f"  > Similarity score: {similarity_score}")
+
+                cosine_score = cosine_similarity_tfidf_score(ocr_text, true_text)
+                print(f"  > Cosine similarity score: {cosine_score}")
+
+                jaccard_score = jaccard_similarity_score(ocr_text, true_text)
+                print(f"  > Jaccard similarity score: {jaccard_score}")
+
+                levenshtein_score = levenshtein_similarity_score(ocr_text, true_text)
+                print(f"  > Levenshtein similarity score: {levenshtein_score}")
+
+                ngram_score = ngram_similarity_score(ocr_text, true_text)
+                print(f"  > N-gram similarity score: {ngram_score}")
+
     print("-" * 60)
     print("Directory processing completed.")
 
 if __name__ == "__main__":
-    #dataset_directory = "dataset/timenote/test"
-    dataset_directory = "dataset/berlin-mitte/" 
+    dataset_directory = "dataset/timenote/test"
+    #dataset_directory = "dataset/berlin-mitte/" 
+    #dataset_directory = "dataset/timenote/"
     process_directory(dataset_directory)
