@@ -1,11 +1,9 @@
 import string
 import unicodedata
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import jellyfish
 from Levenshtein import distance as levenshtein_distance
-
-# TODO do not penalize for extra word tokens in OCR text, adjust metrics for that
+from collections import Counter
 
 def normalize_text(text):
     """
@@ -18,6 +16,8 @@ def normalize_text(text):
     normalized = normalized.lower()  # Ensure lowercase
     normalized = re.sub(r'\s+', ' ', normalized)  # Standardize whitespace
     return normalized
+
+# word level similarity metrics
 
 def basic_similarity_score(ocr_text, true_text):
     """
@@ -49,25 +49,6 @@ def basic_similarity_score(ocr_text, true_text):
     formatted_score = "{:.5f}".format(match_score)
     return formatted_score
 
-def cosine_similarity_tfidf_score(ocr_text, true_text):
-    """
-    Calculates the cosine similarity score between two texts using TF-IDF vectorization.
-    This approach vectorizes the OCR and true text into TF-IDF vectors and then computes
-    the cosine similarity between these vectors, providing a measure of textual similarity
-    that considers both the frequency and significance of words.
-    """
-    ocr_text_norm = normalize_text(ocr_text)
-    true_text_norm = normalize_text(true_text)
-    
-    # Vectorize the texts
-    vectorizer = TfidfVectorizer()
-    tfidf_matrix = vectorizer.fit_transform([ocr_text_norm, true_text_norm])
-    
-    # Calculate cosine similarity
-    sim_score = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-    
-    return "{:.5f}".format(sim_score)
-
 def jaccard_similarity_score(ocr_text, true_text):
     """
     Calculates the Jaccard similarity score between two texts.
@@ -98,57 +79,133 @@ def jaccard_similarity_score(ocr_text, true_text):
     formatted_score = "{:.5f}".format(jaccard_score)
     return formatted_score
 
-def levenshtein_similarity_score(ocr_text, true_text):
+# char level similarity metrics
+
+def levenshtein_similarity_allow_extras(true_text, ocr_text):
     """
-    Calculates a normalized Levenshtein similarity score between two texts.
-    The score is normalized by the maximum possible distance (length of the longer text),
-    so it ranges from 0 (completely different) to 1 (exactly the same).
+    Calculates a modified Levenshtein similarity score that allows for extra characters in the OCR text.
     """
-    # Normalize texts
-    norm_ocr_text = normalize_text(ocr_text)
-    norm_true_text = normalize_text(true_text)
+    true_text = true_text.lower()
+    ocr_text = ocr_text.lower()
+
+    min_distance = float('inf')
+    true_text_len = len(true_text)
+
+    for i in range(len(ocr_text) - true_text_len + 1):
+        segment = ocr_text[i:i+true_text_len]
+        distance = levenshtein_distance(true_text, segment)
+        min_distance = min(min_distance, distance)
     
-    # Calculate Levenshtein distance
-    distance = levenshtein_distance(norm_ocr_text, norm_true_text)
+    similarity_score = max(0, 1 - (min_distance / true_text_len))
+    formatted_score = "{:.5f}".format(similarity_score)
+    return formatted_score
+
+def lcs_length(X, Y):
+    """
+    Computes the length of the longest common subsequence between two sequences.
+    Dynamic programming approach.
+    """
+    m = len(X)
+    n = len(Y)
+    L = [[0] * (n+1) for i in range(m+1)]
+  
+    for i in range(m+1):
+        for j in range(n+1):
+            if i == 0 or j == 0:
+                L[i][j] = 0
+            elif X[i-1] == Y[j-1]:
+                L[i][j] = L[i-1][j-1] + 1
+            else:
+                L[i][j] = max(L[i-1][j], L[i][j-1])
+  
+    return L[m][n]
+
+def lcs_similarity_score(true_text, ocr_text):
+    """
+    Calculates a similarity score based on the Longest Common Subsequence (LCS)
+    between two normalized texts. The score is the length of the LCS divided by
+    the length of the true text, to normalize the score.
+    """
+    true_text = normalize_text(true_text)
+    ocr_text = normalize_text(ocr_text)
     
-    # Normalize the distance to get a similarity score
-    max_length = max(len(norm_ocr_text), len(norm_true_text))
-    if max_length == 0:  # Prevent division by zero
-        return "1.00000"  # Texts are the same if both are empty
-    similarity = 1 - distance / max_length
-    
-    # Format similarity score up to 5 decimal places
-    return "{:.5f}".format(similarity)
+    # Preliminary check for any common character
+    if not set(true_text).intersection(set(ocr_text)):
+        return 0.0
+
+    lcs_len = lcs_length(true_text, ocr_text)
+    if len(true_text) == 0:
+        return 0 if len(ocr_text) > 0 else 1  # Handling edge cases
+    score = lcs_len / len(true_text)
+    formatted_score = "{:.5f}".format(score)
+    return formatted_score
     
 def generate_ngrams(text, n=2):
     """
-    Generate n-grams from a given text.
-
-    Parameters:
-    - text (str): The text from which to generate n-grams.
-    - n (int): The number of elements in each n-gram.
-
-    Returns:
-    - list: A list of n-gram strings.
+    Generate n-grams from the provided text after normalization.
+    
+    :param text: The text to generate n-grams from.
+    :param n: The number of items in each n-gram.
+    :return: A list of n-grams.
     """
-    # Remove spaces for character n-grams to treat the text as a continuous sequence of characters
-    text = text.replace(" ", "").lower()
-    ngrams = [text[i:i+n] for i in range(len(text)-n+1)]
+    text = normalize_text(text)  # Apply normalization
+    words = text.split()
+    ngrams = [' '.join(words[i:i+n]) for i in range(len(words)-n+1)]
     return ngrams
 
-def ngram_similarity_score(ocr_text, true_text, n=2):
+def ngram_similarity_score(true_text, ocr_text, n=2):
     """
-    Calculate the similarity between two texts based on their n-grams.
-    """
-    ocr_ngrams = set(generate_ngrams(ocr_text, n))
-    true_ngrams = set(generate_ngrams(true_text, n))
-
-    # Calculate the Jaccard similarity
-    intersection = len(ocr_ngrams.intersection(true_ngrams))
-    union = len(ocr_ngrams.union(true_ngrams))
-    if union == 0:
-        return "1.00000"  # If both texts are empty, consider them identical
-    jaccard_similarity = intersection / union
+    Calculate the similarity between two texts based on their n-grams,
+    with normalization applied, focusing on the presence of true text n-grams in the OCR text.
     
-    # Format similarity score up to 5 decimal places
-    return "{:.5f}".format(jaccard_similarity)
+    :param true_text: The true text.
+    :param ocr_text: The OCR-generated text.
+    :param n: The number of items in each n-gram.
+    :return: The similarity score as a float.
+    """
+    true_ngrams = generate_ngrams(true_text, n)
+    ocr_ngrams = generate_ngrams(ocr_text, n)
+    
+    true_ngram_counts = Counter(true_ngrams)
+    ocr_ngram_counts = Counter(ocr_ngrams)
+    
+    common_ngrams = set(true_ngrams) & set(ocr_ngrams)
+    total_common_ngrams = sum(min(true_ngram_counts[ng], ocr_ngram_counts[ng]) for ng in common_ngrams)
+    
+    if not true_ngrams:
+        return 1.0 if not ocr_ngrams else 0.0  # Handle edge cases
+    similarity_score = total_common_ngrams / len(true_ngrams)
+    
+    return similarity_score
+
+def combined_ngram_similarity_score(true_text, ocr_text):
+    """
+    Calculate a combined similarity score based on unigrams and bigrams.
+    """
+    # Unigram similarity
+    unigram_similarity = ngram_similarity_score(true_text, ocr_text, n=1)
+    
+    # Bigram similarity
+    bigram_similarity = ngram_similarity_score(true_text, ocr_text, n=2)
+    
+    # Average the unigram and bigram similarity scores
+    combined_similarity = (unigram_similarity + bigram_similarity) / 2
+    formatted_score = "{:.5f}".format(combined_similarity)
+    return formatted_score
+
+def jaro_winkler_similarity(true_text, ocr_text):
+    """
+    Calculate the Jaro-Winkler similarity between two texts after normalization.
+    
+    :param true_text: The true text.
+    :param ocr_text: The OCR-generated text.
+    :return: The similarity score as a float.
+    """
+    # Normalize texts
+    normalized_true_text = normalize_text(true_text)
+    normalized_ocr_text = normalize_text(ocr_text)
+
+    # Calculate Jaro-Winkler similarity
+    similarity = jellyfish.jaro_winkler_similarity(normalized_true_text, normalized_ocr_text)
+    formatted_score = "{:.5f}".format(similarity)
+    return formatted_score
