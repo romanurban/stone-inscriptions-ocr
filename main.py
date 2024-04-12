@@ -1,4 +1,4 @@
-from similarity_metrics import basic_similarity_score, jaccard_similarity_score, levenshtein_similarity_allow_extras, combined_ngram_similarity_score
+from similarity_metrics import basic_similarity_score, jaccard_similarity_score, levenshtein_similarity_allow_extras, combined_ngram_similarity_score, lcs_similarity_score, jaro_winkler_similarity
 from tesseract_ocr import run_tesseract_ocr
 from dataset_helper import get_true_text, get_json_details, extract_lang
 import os
@@ -53,6 +53,12 @@ def process_directory(directory):
 
                 ngram_score = combined_ngram_similarity_score(ocr_text, true_text)
                 print(f"  > N-gram similarity score: {ngram_score}")
+
+                lcs_score = lcs_similarity_score(ocr_text, true_text)
+                print(f"  > Longest Common Subsequence similarity score: {lcs_score}")
+
+                jaro_winkler_score = jaro_winkler_similarity(ocr_text, true_text)
+                print(f"  > Jaro-Winkler similarity score: {jaro_winkler_score}")
 
     print("-" * 60)
     print("Directory processing completed.")

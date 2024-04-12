@@ -5,7 +5,7 @@ import jellyfish
 from Levenshtein import distance as levenshtein_distance
 from collections import Counter
 
-def normalize_text(text):
+def normalize_text(text, strip_whitespace=False):
     """
     Normalize text by removing diacritics from characters, removing numbers and handling special cases.
     This includes converting German umlauts to their base letters and 'ß' to 'ss'.
@@ -14,7 +14,10 @@ def normalize_text(text):
     normalized = unicodedata.normalize('NFD', text)
     normalized = ''.join(ch for ch in normalized if unicodedata.category(ch) != 'Mn' and not ch.isdigit())
     normalized = normalized.lower()  # Ensure lowercase
-    normalized = re.sub(r'\s+', ' ', normalized)  # Standardize whitespace
+    if strip_whitespace:
+        normalized = re.sub(r'\s+', '', normalized)  # Remove all whitespace
+    else:
+        normalized = re.sub(r'\s+', ' ', normalized)  # Standardize whitespace to single spaces
     return normalized
 
 # word level similarity metrics
@@ -85,11 +88,14 @@ def levenshtein_similarity_allow_extras(true_text, ocr_text):
     """
     Calculates a modified Levenshtein similarity score that allows for extra characters in the OCR text.
     """
-    true_text = true_text.lower()
-    ocr_text = ocr_text.lower()
+    true_text = normalize_text(true_text)
+    ocr_text = normalize_text(ocr_text)
 
     min_distance = float('inf')
     true_text_len = len(true_text)
+
+    if true_text_len == 0:
+        return "0.00000"
 
     for i in range(len(ocr_text) - true_text_len + 1):
         segment = ocr_text[i:i+true_text_len]
@@ -126,8 +132,8 @@ def lcs_similarity_score(true_text, ocr_text):
     between two normalized texts. The score is the length of the LCS divided by
     the length of the true text, to normalize the score.
     """
-    true_text = normalize_text(true_text)
-    ocr_text = normalize_text(ocr_text)
+    true_text = normalize_text(true_text, True)
+    ocr_text = normalize_text(ocr_text, True)
     
     # Preliminary check for any common character
     if not set(true_text).intersection(set(ocr_text)):
@@ -202,8 +208,8 @@ def jaro_winkler_similarity(true_text, ocr_text):
     :return: The similarity score as a float.
     """
     # Normalize texts
-    normalized_true_text = normalize_text(true_text)
-    normalized_ocr_text = normalize_text(ocr_text)
+    normalized_true_text = normalize_text(true_text, True)
+    normalized_ocr_text = normalize_text(ocr_text, True)
 
     # Calculate Jaro-Winkler similarity
     similarity = jellyfish.jaro_winkler_similarity(normalized_true_text, normalized_ocr_text)
