@@ -1,14 +1,14 @@
 import os
 from dotenv import load_dotenv
-from tesseract_ocr import run_tesseract_ocr
+from tesseract_ocr import TesseractOCR
 from google_vision_ocr import GoogleVisionOCR
-from dataset_helper import get_true_text, get_json_details, extract_lang
 from similarity_score_service import ScoreService
+from dataset_helper import get_true_text, get_json_details, extract_lang
 
 load_dotenv()
 creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 
-REVISION = "INITIAL";
+REVISION = "INITIAL"
 DEFAULT_LANGUAGE = 'lav' # default latvian language code for timenote dataset
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
 MITTE_DS_LANG_CODE = 'deu' # default german language code for the 'berlin-mitte/' dataset
@@ -18,6 +18,7 @@ def process_directory(directory):
     print("Starting directory processing...")
     print("-" * 60)
     google_vision_ocr = GoogleVisionOCR()
+    tesseract_ocr = TesseractOCR() 
     score_service = ScoreService(REVISION)  # Set a base directory for scores
 
     for root, dirs, files in os.walk(directory):
@@ -37,7 +38,7 @@ def process_directory(directory):
                 else:
                     print(f"  > No JSON details found for {file}")
 
-                ocr_text = run_tesseract_ocr(image_path, lang)
+                ocr_text = tesseract_ocr.run_ocr(image_path, lang)
                 google_vision_ocr_text = google_vision_ocr.perform_ocr(image_path)
 
                 print(f"  > Tesseract OCR text: {ocr_text if ocr_text else '[No text detected]'}")
