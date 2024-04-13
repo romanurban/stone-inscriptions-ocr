@@ -5,6 +5,7 @@ TEST_CASES = [
     ("Lorem Ipsum dolor", "Lorem dolor", "missing tokens"),
     ("Lorem Ipsum", "Ipsum Lorem", "reordered words"),
     ("Lorem Ipsum", "d foo Lorem Ipsum dolor sit amet", "extra tokens"),
+    ("Lorem Ipsum", "d foo Lorem Ipsum dolor sit amet consectetur adipiscing elit", "more extra tokens"),
     ("The quick", "brown-fox", "completely different"),
     ("Lorem Ipsum", "", "OCR text empty")
 ]

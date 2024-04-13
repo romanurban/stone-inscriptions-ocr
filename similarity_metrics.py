@@ -4,6 +4,9 @@ import re
 import jellyfish
 from Levenshtein import distance as levenshtein_distance
 from collections import Counter
+from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
+import difflib
 
 def normalize_text(text, strip_whitespace=False):
     """
@@ -215,3 +218,58 @@ def jaro_winkler_similarity(true_text, ocr_text):
     similarity = jellyfish.jaro_winkler_similarity(normalized_true_text, normalized_ocr_text)
     formatted_score = "{:.5f}".format(similarity)
     return formatted_score
+
+def fuzzywuzzy_similarity(true_text, ocr_text):
+    """
+    Calculates the similarity score between two texts using the fuzzywuzzy library's ratio function.
+    This function computes the Levenshtein distance percentage between two strings, providing a score
+    between 0 and 100, where 100 represents a perfect match.
+
+    :param true_text: The correct version of the text.
+    :param ocr_text: The OCR-generated version of the text.
+    :return: The similarity score as a percentage.
+    """
+    # Normalize texts
+    normalized_true_text = normalize_text(true_text, True)
+    normalized_ocr_text = normalize_text(ocr_text, True)
+
+    # Calculate fuzzywuzzy similarity
+    similarity = fuzz.ratio(normalized_true_text, normalized_ocr_text)
+    return similarity / 100.0  # Convert to a score between 0 and 1
+
+def rapidfuzz_similarity(true_text, ocr_text):
+    """
+    Calculates the similarity score between two texts using the RapidFuzz library's fuzz module.
+    This function provides a similarity percentage based on advanced edit distances, which can
+    offer better performance and accuracy for certain text comparison tasks.
+
+    :param true_text: The correct version of the text.
+    :param ocr_text: The OCR-generated version of the text.
+    :return: The similarity score as a float between 0 and 1.
+    """
+    # Normalize texts
+    normalized_true_text = normalize_text(true_text, True)
+    normalized_ocr_text = normalize_text(ocr_text, True)
+
+    # Calculate similarity using the rapidfuzz library
+    similarity = fuzz.ratio(normalized_true_text, normalized_ocr_text)
+    return similarity / 100.0  # Convert to a score between 0 and 1
+
+def difflib_similarity(true_text, ocr_text):
+    """
+    Calculates the similarity score between two texts using the difflib library's SequenceMatcher.
+    This method compares the sequences and outputs a similarity ratio, a float between 0 and 1,
+    where 1 means the sequences are identical.
+
+    :param true_text: The correct version of the text.
+    :param ocr_text: The OCR-generated version of the text.
+    :return: The similarity score as a float between 0 and 1.
+    """
+    # Normalize texts
+    normalized_true_text = normalize_text(true_text, True)
+    normalized_ocr_text = normalize_text(ocr_text, True)
+
+    # Create a SequenceMatcher object and calculate the similarity ratio
+    matcher = difflib.SequenceMatcher(None, normalized_true_text, normalized_ocr_text)
+    similarity = matcher.ratio()
+    return similarity

@@ -35,6 +35,9 @@ class TestJaccardSimilarity(unittest.TestCase):
                 elif description == "extra tokens":
                     # Expecting the presence of extra tokens to reduce the score, but not drastically
                     self.assertGreater(score, 0.0)
+                elif description == "more extra tokens":
+                    # Expecting the presence of extra tokens to reduce the score, but not drastically
+                    self.assertGreater(score, 0.0)
                 elif description == "completely different":
                     self.assertEqual(score, 0.0)
                 elif description == "OCR text empty":

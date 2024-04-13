@@ -14,7 +14,7 @@ def get_true_text(json_item, image_path):
         true_text = json_item.get('description', '')
     elif 'timenote/' in image_path:
         # Concatenate the fields to form the true text for the 'timenote' dataset
-        true_text = ' '.join(json_item.get(field, '') for field in ['person_name', 'extra_names', 'patronymic']).strip()
+        true_text = ' '.join(json_item.get(field, '') for field in ['person_name', 'patronymic']).strip()
     return true_text
 
 def get_json_details(image_path, directory):

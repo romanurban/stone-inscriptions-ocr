@@ -35,6 +35,8 @@ class TestBasicSimilarity(unittest.TestCase):
                     self.assertGreater(score, 0.0)
                 elif description == "extra tokens":
                     self.assertGreater(score, 0.0)
+                elif description == "more extra tokens":
+                    self.assertGreater(score, 0.0)
                 elif description == "completely different":
                     self.assertEqual(score, 0.0)
                 elif description == "OCR text empty":

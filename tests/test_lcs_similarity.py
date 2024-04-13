@@ -36,6 +36,9 @@ class TestLCSSimilarity(unittest.TestCase):
                 elif description == "extra tokens":
                     # Extra tokens can potentially increase the length of the sequence without affecting the LCS of the true text
                     self.assertGreaterEqual(score, 1.0)
+                elif description == "more extra tokens":
+                    # More extra tokens can increase the length of the sequence without affecting the LCS of the true text
+                    self.assertGreaterEqual(score, 1.0)
                 elif description == "completely different":
                     # Completely different texts should have a very low LCS score
                     self.assertLess(score, 0.5)

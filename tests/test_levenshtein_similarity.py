@@ -35,6 +35,9 @@ class TestLevenshteinSimilarity(unittest.TestCase):
                 elif description == "extra tokens":
                     # Extra tokens will affect the score, but it should be relatively high if all true text tokens are found
                     self.assertGreater(score, 0.5)
+                elif description == "more extra tokens":
+                    # More extra tokens will affect the score, but it should be relatively high if all true text tokens are found
+                    self.assertGreater(score, 0.5)
                 elif description == "completely different":
                     # Completely different texts should yield the lowest score
                     self.assertEqual(score, 0.0)

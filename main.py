@@ -1,6 +1,9 @@
-from similarity_metrics import basic_similarity_score, jaccard_similarity_score, levenshtein_similarity_allow_extras, combined_ngram_similarity_score, lcs_similarity_score, jaro_winkler_similarity
+from similarity_metrics import (
+    basic_similarity_score, lcs_similarity_score, jaro_winkler_similarity, difflib_similarity
+)
 from tesseract_ocr import run_tesseract_ocr
 from dataset_helper import get_true_text, get_json_details, extract_lang
+from similarity_score import calculate_composite_score
 import os
 
 DEFAULT_LANGUAGE = 'lav' # default latvian language code for timenote dataset
@@ -38,27 +41,34 @@ def process_directory(directory):
                 ocr_text = run_tesseract_ocr(image_path, lang)
                 if ocr_text:
                     #print(f"  > OCR text: {ocr_text[:50]}...")
-                    print(f"  > OCR text: {ocr_text}...")
+                    print(f"  > OCR text: {ocr_text}")
+
+                    # Calculating all necessary similarity scores
+                    scores_dict = {
+                        'basic_similarity_score': basic_similarity_score(ocr_text, true_text),
+                        'lcs_similarity_score': lcs_similarity_score(ocr_text, true_text),
+                        'jaro_winkler_similarity': jaro_winkler_similarity(ocr_text, true_text),
+                        'difflib_similarity': difflib_similarity(ocr_text, true_text)
+                    }
+                    
+                    # Print all scores
+                    for name, score in scores_dict.items():
+                        print(f"  > {name.replace('_', ' ').capitalize()}: {score}")
+                    
+                    # Select specific scores for the composite calculation
+                    selected_scores = [
+                        scores_dict['lcs_similarity_score'],
+                        scores_dict['jaro_winkler_similarity'],
+                        scores_dict['basic_similarity_score'],
+                        scores_dict['difflib_similarity']
+                    ]
+                    
+                    # Calculate the composite score with selected metrics
+                    composite_score = calculate_composite_score(selected_scores)
+                    print(f"  > Composite similarity score: {composite_score}")
+
                 else:
                     print("  > OCR text: [No text detected]")
-
-                similarity_score = basic_similarity_score(ocr_text, true_text)
-                print(f"  > Similarity score: {similarity_score}")
-
-                jaccard_score = jaccard_similarity_score(ocr_text, true_text)
-                print(f"  > Jaccard similarity score: {jaccard_score}")
-
-                levenshtein_score = levenshtein_similarity_allow_extras(ocr_text, true_text)
-                print(f"  > Levenshtein similarity score: {levenshtein_score}")
-
-                ngram_score = combined_ngram_similarity_score(ocr_text, true_text)
-                print(f"  > N-gram similarity score: {ngram_score}")
-
-                lcs_score = lcs_similarity_score(ocr_text, true_text)
-                print(f"  > Longest Common Subsequence similarity score: {lcs_score}")
-
-                jaro_winkler_score = jaro_winkler_similarity(ocr_text, true_text)
-                print(f"  > Jaro-Winkler similarity score: {jaro_winkler_score}")
 
     print("-" * 60)
     print("Directory processing completed.")
