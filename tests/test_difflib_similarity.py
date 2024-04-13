@@ -15,7 +15,8 @@ class TestDifflibSimilarity(unittest.TestCase):
         for true_text, ocr_text, description in TEST_CASES:
             with self.subTest(description=description):
                 score = difflib_similarity(true_text, ocr_text)
-                print(f"{description} score: {score:.5f}")
+                print(f"{description} score: {score}")
+                score = float(score)
 
                 # Convert the percentage score to a float for comparison
                 score = float(score)

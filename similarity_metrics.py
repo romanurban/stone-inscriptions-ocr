@@ -140,7 +140,7 @@ def lcs_similarity_score(true_text, ocr_text):
     
     # Preliminary check for any common character
     if not set(true_text).intersection(set(ocr_text)):
-        return 0.0
+        return "0.00000"
 
     lcs_len = lcs_length(true_text, ocr_text)
     if len(true_text) == 0:
@@ -272,4 +272,5 @@ def difflib_similarity(true_text, ocr_text):
     # Create a SequenceMatcher object and calculate the similarity ratio
     matcher = difflib.SequenceMatcher(None, normalized_true_text, normalized_ocr_text)
     similarity = matcher.ratio()
-    return similarity
+    formatted_score = "{:.5f}".format(similarity)
+    return formatted_score

@@ -18,7 +18,7 @@ def process_directory(directory):
     print("Starting directory processing...")
     print("-" * 60)
     google_vision_ocr = GoogleVisionOCR()
-    score_service = ScoreService(directory, REVISION)
+    score_service = ScoreService(REVISION)  # Set a base directory for scores
 
     for root, dirs, files in os.walk(directory):
         for file in files:
@@ -53,5 +53,5 @@ def process_directory(directory):
 if __name__ == "__main__":
     #dataset_directory = "dataset/timenote/test"
     #dataset_directory = "dataset/berlin-mitte/" 
-    #dataset_directory = "dataset/timenote/"
+    dataset_directory = "dataset/timenote/"
     process_directory(dataset_directory)
