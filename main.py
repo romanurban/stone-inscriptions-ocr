@@ -3,7 +3,7 @@ from similarity_metrics import (
 )
 from tesseract_ocr import run_tesseract_ocr
 from dataset_helper import get_true_text, get_json_details, extract_lang
-from similarity_score import calculate_composite_score
+from similarity_score_calculator import CompositeScoreCalculator
 import os
 
 DEFAULT_LANGUAGE = 'lav' # default latvian language code for timenote dataset
@@ -64,7 +64,8 @@ def process_directory(directory):
                     ]
                     
                     # Calculate the composite score with selected metrics
-                    composite_score = calculate_composite_score(selected_scores)
+                    score_calculator = CompositeScoreCalculator(selected_scores)
+                    composite_score = score_calculator.calculate()
                     print(f"  > Composite similarity score: {composite_score}")
 
                 else:
@@ -76,7 +77,7 @@ def process_directory(directory):
     # TODO test similarity on synthetic data using ethalon texts with possible alterations
 
 if __name__ == "__main__":
-    #dataset_directory = "dataset/timenote/test"
-    dataset_directory = "dataset/berlin-mitte/" 
+    dataset_directory = "dataset/timenote/test"
+    #dataset_directory = "dataset/berlin-mitte/" 
     #dataset_directory = "dataset/timenote/"
     process_directory(dataset_directory)
