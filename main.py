@@ -1,25 +1,25 @@
-from similarity_metrics import (
-    basic_similarity_score, lcs_similarity_score, jaro_winkler_similarity, difflib_similarity
-)
-from tesseract_ocr import run_tesseract_ocr
-from dataset_helper import get_true_text, get_json_details, extract_lang
-from similarity_score_calculator import CompositeScoreCalculator
 import os
+from dotenv import load_dotenv
+from tesseract_ocr import run_tesseract_ocr
+from google_vision_ocr import GoogleVisionOCR
+from dataset_helper import get_true_text, get_json_details, extract_lang
+from similarity_score_service import ScoreService
 
+load_dotenv()
+creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+
+REVISION = "INITIAL";
 DEFAULT_LANGUAGE = 'lav' # default latvian language code for timenote dataset
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
 MITTE_DS_LANG_CODE = 'deu' # default german language code for the 'berlin-mitte/' dataset
 
 def process_directory(directory):
-    """
-    Walks through the given directory, performing OCR on each image file,
-    and then extracts additional details from a corresponding JSON file.
-    :param directory: Directory to process.
-    :param default_lang: Default OCR language.
-    """
     lang = DEFAULT_LANGUAGE
     print("Starting directory processing...")
     print("-" * 60)
+    google_vision_ocr = GoogleVisionOCR()
+    score_service = ScoreService(directory, REVISION)
+
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS):
@@ -30,54 +30,28 @@ def process_directory(directory):
                 if json_details:
                     if 'timenote' in image_path:
                         lang = extract_lang(json_details)
-                    else: 
+                    else:
                         lang = MITTE_DS_LANG_CODE
-                    print(f"  > Found JSON details for {file}")
-                    # Extract true text using the image path to determine dataset type
-                    true_text = get_true_text(json_details, image_path)
+                    true_text = get_true_text(json_details, image_path)  # Extract true text
                     print(f"  > True text: {true_text}")
                 else:
                     print(f"  > No JSON details found for {file}")
+
                 ocr_text = run_tesseract_ocr(image_path, lang)
-                if ocr_text:
-                    #print(f"  > OCR text: {ocr_text[:50]}...")
-                    print(f"  > OCR text: {ocr_text}")
+                google_vision_ocr_text = google_vision_ocr.perform_ocr(image_path)
 
-                    # Calculating all necessary similarity scores
-                    scores_dict = {
-                        'basic_similarity_score': basic_similarity_score(ocr_text, true_text),
-                        'lcs_similarity_score': lcs_similarity_score(ocr_text, true_text),
-                        'jaro_winkler_similarity': jaro_winkler_similarity(ocr_text, true_text),
-                        'difflib_similarity': difflib_similarity(ocr_text, true_text)
-                    }
-                    
-                    # Print all scores
-                    for name, score in scores_dict.items():
-                        print(f"  > {name.replace('_', ' ').capitalize()}: {score}")
-                    
-                    # Select specific scores for the composite calculation
-                    selected_scores = [
-                        scores_dict['lcs_similarity_score'],
-                        scores_dict['jaro_winkler_similarity'],
-                        scores_dict['basic_similarity_score'],
-                        scores_dict['difflib_similarity']
-                    ]
-                    
-                    # Calculate the composite score with selected metrics
-                    score_calculator = CompositeScoreCalculator(selected_scores)
-                    composite_score = score_calculator.calculate()
-                    print(f"  > Composite similarity score: {composite_score}")
+                print(f"  > Tesseract OCR text: {ocr_text if ocr_text else '[No text detected]'}")
+                print(f"  > Google Vision OCR text: {google_vision_ocr_text if google_vision_ocr_text else '[No text detected]'}")
+                # TODO: add apple vision ocr
 
-                else:
-                    print("  > OCR text: [No text detected]")
+                score_service.process_scores(image_path, "Tesseract", true_text, ocr_text)
+                score_service.process_scores(image_path, "Google Vision", true_text, google_vision_ocr_text)
 
     print("-" * 60)
     print("Directory processing completed.")
 
-    # TODO test similarity on synthetic data using ethalon texts with possible alterations
-
 if __name__ == "__main__":
-    dataset_directory = "dataset/timenote/test"
+    #dataset_directory = "dataset/timenote/test"
     #dataset_directory = "dataset/berlin-mitte/" 
     #dataset_directory = "dataset/timenote/"
     process_directory(dataset_directory)
