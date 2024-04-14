@@ -53,8 +53,7 @@ class ScoreService:
         output_file = os.path.join(output_directory, 'scores.json')
         self.ensure_directory(output_directory)
 
-        # Append to the JSON file, ensuring atomic writes
         with open(output_file, 'a') as f:
-            f.write(json.dumps(score_entry, ensure_ascii=False, indent=4) + ",\n")  # Append as a new JSON object
-
-        print(f"Scores for {full_file_path} logged.")
+            json_entry = json.dumps(score_entry, ensure_ascii=False, indent=4)
+            f.write(json_entry + ",\n")  # Append as a new JSON object
+        print(json_entry)

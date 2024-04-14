@@ -52,7 +52,16 @@ def process_directory(directory):
     print("Directory processing completed.")
 
 if __name__ == "__main__":
+    #dataset_directory = "dataset/timenote/"
+
+    #dataset_directory = "dataset/timenote/Bikernieku_kapi"
+    #dataset_directory = "dataset/timenote/Bolderajas_kapi"
+    #dataset_directory = "dataset/timenote/Jaunciema_kapi"
+    #dataset_directory = "dataset/timenote/Katlakalna_kapi"
+    #dataset_directory = "dataset/timenote/Lacupes_kapi"
+    #dataset_directory = "dataset/timenote/Pleskodales_kapi"
+    #dataset_directory = "dataset/timenote/Tornakalna_kapi"
+    
     #dataset_directory = "dataset/timenote/test"
-    #dataset_directory = "dataset/berlin-mitte/" 
-    dataset_directory = "dataset/timenote/"
+    dataset_directory = "dataset/berlin-mitte/" 
     process_directory(dataset_directory)
