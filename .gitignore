@@ -1,5 +1,6 @@
 # data
 dataset/*
+dataset_masked/*
 
 credentials/*
 ocr_results/*
