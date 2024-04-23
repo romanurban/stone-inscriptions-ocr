@@ -5,9 +5,6 @@ from google_vision_ocr import GoogleVisionOCR
 from similarity_score_service import ScoreService
 from dataset_helper import get_true_text, get_json_details, extract_lang
 
-load_dotenv()
-creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-
 REVISION = "INITIAL"
 DEFAULT_LANGUAGE = 'lav' # default latvian language code for timenote dataset
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
