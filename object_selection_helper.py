@@ -138,6 +138,9 @@ class ObjectSelectionHelper:
         return masked
 
     def _calculate_score(self, masked_image):
+        # TODO search for gray colors dominating the image if both are close keep 2 segments  
+        # get rid of text detection
+
         # Edge density calculation (lower is better)
         edge_density = np.sum(cv2.Canny(masked_image, 100, 200)) / masked_image.size
         # If edge_density is 0 (which is unlikely), we avoid division by zero

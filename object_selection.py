@@ -89,6 +89,15 @@ class ObjectSelection:
         # Find the non-transparent points
         non_transparent_points = np.argwhere(transparent_image[:, :, 3] != 0)
 
+        if non_transparent_points.size == 0:
+            output_path = os.path.join(self.base_output_dir, os.path.basename(self.input_image_path).replace('.jpg', suffix))
+            cv2.imwrite(output_path, transparent_image)
+
+            if self.verbose:
+                print(f"Final masked image saved to {transparent_image}")
+
+            return output_path
+
         # Find the bounding box of those points
         top_left = non_transparent_points.min(axis=0)[:2]
         bottom_right = non_transparent_points.max(axis=0)[:2]
