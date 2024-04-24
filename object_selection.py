@@ -27,29 +27,58 @@ class ObjectSelection:
     def setup_helper(self):
         self.helper = ObjectSelectionHelper(verbose=self.verbose)
 
+    def apply_color_overlay(self, image, color='blue', alpha=0.5):
+        # Define the color values
+        color_values = {
+            'blue': [255, 0, 0],  # Blue color in BGR
+            'pink': [255, 105, 180]  # Pink color in BGR
+        }
+
+        # Get the color value from the color name
+        color = color_values.get(color.lower())
+        if color is None:
+            print(f"Invalid color name: {color}")
+            return image
+
+        # Create a 3D mask with the specified color where the original mask is white
+        overlay = np.zeros((*image.shape, 4), dtype=np.uint8)  # 4th channel for Alpha
+        overlay[image == 255, :3] = color
+        overlay[image == 255, 3] = 255 * alpha  # Apply alpha to the 4th channel
+
+
+        return overlay
+    
     def process_image(self, method='color_segmentation'):
         images = {'original': cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)}
 
         if method == 'color_segmentation':
             threshold = self.helper.color_segmentation_lab(self.image)
-            suffix = '_mask1'
+            suffix = '_color_segmentation'
         elif method == 'edge_detection':
             threshold = self.helper.detect_and_invert_edges(self.image)
-            suffix = '_mask2'
+            suffix = '_edge_detection'
 
-        images['threshold'] = threshold
+        images['thresholded'] = threshold
         eroded_image = self.helper.erode_until_max_area(threshold)
         images['eroded'] = eroded_image
         top_regions = self.helper.retain_top_regions_thresholded(eroded_image)
-        images['top_regions'] = top_regions
-        closed_image = self.helper.perform_morphological_closing(top_regions)
-        images['closed'] = closed_image
+        
+        picked_region = self.helper.detect_and_score_regions(top_regions, self.image)
+        overlayed_picked_region = self.apply_color_overlay(picked_region, color='blue')
+        # Convert picked_region to a 3-channel image
+        picked_region_color = cv2.cvtColor(picked_region, cv2.COLOR_GRAY2BGRA)
+        hl_picked_region = cv2.addWeighted(overlayed_picked_region, 0.5, picked_region_color, 0.5, 0)
+        # todo figure out how to display both images
+        images['best_candidate_regions'] = hl_picked_region
+        
+        closed_image = self.helper.perform_morphological_closing(picked_region)
+        images['morphologically_closed'] = closed_image
 
-        # todo debug
-        #mask = self.helper.detect_and_score_regions(closed_image, self.image)
-        mask = closed_image
+        # make mask rectangular shape
+        rect_mask = self.helper.rectify_mask(picked_region)
+        # todo paint the mask other color and display over the mask
 
-        masked_image = self.helper.apply_mask(self.image, mask)
+        masked_image = self.helper.apply_mask(self.image, rect_mask)
         images['masked'] = cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB)
 
         self.visualize_and_save(images, suffix + '_steps.png')
@@ -115,11 +144,11 @@ class ObjectSelection:
     def run(self):
         self.load_image()
         self.setup_helper()
-        path1 = self.process_image(method='color_segmentation')
-        path2 = self.process_image(method='edge_detection')
+        color_segmentation = self.process_image(method='color_segmentation')
+        edge_detection = self.process_image(method='edge_detection')
 
-        return path1, path2
+        return color_segmentation, edge_detection
 
 # Example usage (This code is commented out for execution purposes):
-#object_selector = ObjectSelection('dataset/preprocessing_test/2022_06_Peteris-Terauds.jpg')
-#object_selector.run()
+object_selector = ObjectSelection('dataset/preprocessing_test/2018_08_Antonina-Fedcenko.jpg')
+object_selector.run()

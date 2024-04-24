@@ -7,6 +7,7 @@ from object_selection import ObjectSelection
 from tesseract_ocr import TesseractOCR
 from google_vision_ocr import GoogleVisionOCR
 from scipy.ndimage import interpolation as inter
+import os
 
 def correct_skew(image, delta=1, limit=5):
     def determine_score(arr, angle):
@@ -78,61 +79,86 @@ def preprocess_for_ocr(image, invert=True):
     return eroded
 
 # Load the image from the file system
-image_path = 'dataset/timenote/Jaunciema_kapi/2018_08_Eduards-Dundurs.jpg'
-# image_path = 'dataset/berlin-mitte/Sandhauser_Str_110.jpg'
-image = Image.open(image_path)
+# image_path = 'dataset/timenote/Jaunciema_kapi/2018_10_Valija-Ernestsone.jpg'
+# image = Image.open(image_path)
 
 # object selection usage performs well only on timenote data subset
-object_selector = ObjectSelection(image_path, verbose=False)
-masked1_path, masked2_path = object_selector.run()
-masked1 = Image.open(masked1_path)
-masked2 = Image.open(masked2_path)
-processed = preprocess_for_ocr(image, invert=True)
-processed_masked1 = preprocess_for_ocr(masked1, invert=True)
-processed_masked2 = preprocess_for_ocr(masked2, invert=True)
+# object_selector = ObjectSelection(image_path, verbose=True)
+# color_segmentation, edge_detection = object_selector.run()
+# color_segmentation = Image.open(color_segmentation)
+# edge_detection = Image.open(edge_detection)
+# processed = preprocess_for_ocr(image, invert=True)
+# processed_color_segmentation = preprocess_for_ocr(color_segmentation, invert=True)
+# processed_edge_detection = preprocess_for_ocr(edge_detection, invert=True)
 
-tesseract = TesseractOCR()
-google_vision = GoogleVisionOCR()
+SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
+# Define the directory to walk
+root_dir = 'dataset/preprocessing_test/'
+output_dir = 'dataset_preprocessed/preprocessing_test/'
 
-text = tesseract.run_ocr(processed, 'lav')
-gtext = google_vision.perform_ocr(processed)
-text1 = tesseract.run_ocr(processed_masked1, 'lav')
-gtext1 = google_vision.perform_ocr(processed_masked1)
-text2 = tesseract.run_ocr(processed_masked2, 'lav')
-gtext2 = google_vision.perform_ocr(processed_masked2)
-print("text", text)
-print("text1", text1)
-print("text2", text2)
-print("gtext", gtext)
-print("gtext1", gtext1)
-print("gtext2", gtext2)
+# Walk through the directory
+for dirpath, dirnames, filenames in os.walk(root_dir):
+    for filename in filenames:
+        # Check if the file is an image
+        if filename.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS):
+            # Load the image
+            image_path = os.path.join(dirpath, filename)
+            image = cv2.imread(image_path)
 
-# TODO this works in a context of one image
-# returns dictionary of processed image 1 or 3
-# in parent function we walk directories, read json details, if score can be improved for google OCR - process image 
-# choose best score - plot the result that worked best
-# maybe mix the results of both OCRs and score them comulatatively if it gives better hit rate
+            # Preprocess the image
+            processed = preprocess_for_ocr(image, invert=True)
+            object_selector = ObjectSelection(image_path, verbose=True)
+            color_segmentation, edge_detection = object_selector.run()
+            color_segmentation = Image.open(color_segmentation)
+            edge_detection = Image.open(edge_detection)
+            processed_color_segmentation = preprocess_for_ocr(color_segmentation, invert=True)
+            processed_edge_detection = preprocess_for_ocr(edge_detection, invert=True)
+
+            # Save the preprocessed images
+            base_output_dir = dirpath.replace(root_dir, output_dir)
+            os.makedirs(base_output_dir, exist_ok=True)
+
+            base_filename = os.path.splitext(filename)[0]
+            cv2.imwrite(os.path.join(base_output_dir, base_filename + '_processed.png'), processed)
+            cv2.imwrite(os.path.join(base_output_dir, base_filename + '_processed_color_segmentation.png'), processed_color_segmentation)
+            cv2.imwrite(os.path.join(base_output_dir, base_filename + '_processed_edge_detection.png'), processed_edge_detection)
+
+# tesseract = TesseractOCR()
+# google_vision = GoogleVisionOCR()
+
+# text = tesseract.run_ocr(processed, 'lav')
+# gtext = google_vision.perform_ocr(processed)
+# text1 = tesseract.run_ocr(processed_masked1, 'lav')
+# gtext1 = google_vision.perform_ocr(processed_masked1)
+# text2 = tesseract.run_ocr(processed_masked2, 'lav')
+# gtext2 = google_vision.perform_ocr(processed_masked2)
+# print("text", text)
+# print("text1", text1)
+# print("text2", text2)
+# print("gtext", gtext)
+# print("gtext1", gtext1)
+# print("gtext2", gtext2)
 
 # Using matplotlib to display both original and processed images side by side
-plt.figure(figsize=(20, 10))
-plt.subplot(2, 2, 1)
-plt.imshow(image)
-plt.title('Original Image')
-plt.axis('on')
+# plt.figure(figsize=(20, 10))
+# plt.subplot(2, 2, 1)
+# plt.imshow(image)
+# plt.title('Original Image')
+# plt.axis('on')
 
-plt.subplot(2, 2, 2)
-plt.imshow(processed, cmap='gray')
-plt.title('Processed Image')
-plt.axis('on')
+# plt.subplot(2, 2, 2)
+# plt.imshow(processed, cmap='gray')
+# plt.title('Processed Image')
+# plt.axis('on')
 
-plt.subplot(2, 2, 3)
-plt.imshow(masked1, cmap='gray')
-plt.title('Mask1 Image')
-plt.axis('on')
+# plt.subplot(2, 2, 3)
+# plt.imshow(masked1, cmap='gray')
+# plt.title('Mask1 Image')
+# plt.axis('on')
 
-plt.subplot(2, 2, 4)
-plt.imshow(masked2, cmap='gray')
-plt.title('Mask2 Image')
-plt.axis('on')
+# plt.subplot(2, 2, 4)
+# plt.imshow(masked2, cmap='gray')
+# plt.title('Mask2 Image')
+# plt.axis('on')
 
-plt.show()
+# plt.show()

@@ -23,7 +23,7 @@ class ObjectSelectionHelper:
 
         # Constants for the morphological operations
         kernel_size = (3, 3)
-        max_iterations = 50
+        max_iterations = 30
         stop_threshold = 5000
         kernel = np.ones(kernel_size, np.uint8)
 
@@ -134,65 +134,124 @@ class ObjectSelectionHelper:
         return inverted_edges
     
     def apply_mask(self, image, mask):
-        masked = cv2.bitwise_and(image, image, mask=mask)
-        return masked
-
-    def _calculate_score(self, masked_image):
-        # TODO search for gray colors dominating the image if both are close keep 2 segments  
-        # get rid of text detection
-
-        # Edge density calculation (lower is better)
-        edge_density = np.sum(cv2.Canny(masked_image, 100, 200)) / masked_image.size
-        # If edge_density is 0 (which is unlikely), we avoid division by zero
-        if edge_density == 0:
-            edge_density_score = float('inf')  # Maximal score if no edges are found
+        if mask is None:
+            print("Mask is None.")
+            return image
+        elif type(mask) != np.ndarray:
+            print(f"Mask is of type {type(mask)}, not numpy.ndarray.")
+            return image
+        elif mask.shape != image.shape[:2]:
+            print(f"Mask shape {mask.shape} does not match image shape {image.shape[:2]}.")
+            return image
         else:
-            edge_density_score = 1 / edge_density  # Inverse of edge density
+            masked = cv2.bitwise_and(image, image, mask=mask)
+            return masked
+
+    def calculate_average_saturation(self, image):
+        # Convert the image from RGB to HSV color space
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         
-        # Text content (higher is better)
-        text_content = len(image_to_string(masked_image, config='--psm 3 --oem 3'))
+        # Extract the Saturation channel
+        saturation_channel = hsv_image[:, :, 1]
         
-        # Mean color calculation (higher is better)
-        mean_color = cv2.meanStdDev(cv2.cvtColor(masked_image, cv2.COLOR_BGR2HSV))[1][0][0]
+        # Calculate the average saturation
+        average_saturation = np.mean(saturation_channel)
+        return average_saturation
+    
+    def calculate_mask_area(self, mask):
+        # Count the number of white pixels (255)
+        area = np.count_nonzero(mask == 255)
+        return area
+    
+    def calculate_centroid_distance_score(self, mask):
+        # Calculate image moments
+        M = cv2.moments(mask)
         
-        # Define weights based on importance of each feature
-        edge_density_weight = 0.5  # Increase weight if edge density is a crucial factor
-        text_content_weight = 0.1
-        mean_color_weight = 0.2
+        # Check if there are any white pixels (area should not be zero)
+        if M["m00"] == 0:
+            print("No white pixels found in mask.")
+            return np.sqrt(mask.shape[0]**2 + mask.shape[1]**2)  # Maximum distance from the center
         
-        # Calculate final weighted score
-        score = (edge_density_score * edge_density_weight +
-                text_content * text_content_weight +
-                mean_color * mean_color_weight)
-        return score
+        # Calculate the centroid from moments
+        centroid_x = M["m10"] / M["m00"]
+        centroid_y = M["m01"] / M["m00"]
+        
+        # Calculate the center of the image
+        center_x = mask.shape[1] / 2
+        center_y = mask.shape[0] / 2
+        
+        # Calculate and return the Euclidean distance from the centroid to the center
+        distance = np.sqrt((centroid_y - center_y)**2 + (centroid_x - center_x)**2)
+        return distance
+    
+    def calculate_combined_score(self, masked_image, mask, max_saturation=255, max_area=None, max_distance=None):
+        if max_area is None:
+            max_area = masked_image.shape[0] * masked_image.shape[1]  # height * width
+        if max_distance is None:
+            max_distance = np.sqrt(masked_image.shape[0]**2 + masked_image.shape[1]**2)  # Diagonal
+
+        average_saturation_score = self.calculate_average_saturation(masked_image)
+        area_score = self.calculate_mask_area(mask)
+        centroid_distance_score = self.calculate_centroid_distance_score(mask)
+
+        # Normalize scores
+        normalized_saturation = 1 - (average_saturation_score / max_saturation)  # Inverted because lower is better
+        normalized_area = area_score / max_area
+        normalized_centroid_distance = 1 - (centroid_distance_score / max_distance)  # Inverted because lower is better
+
+        # print(f"Normalized scores: Saturation={normalized_saturation}, Area={normalized_area}, Centroid Distance={normalized_centroid_distance}")
+
+        # Weights (can be adjusted)
+        w1, w2, w3 = 1, 2, 2
+
+        # print(f"Weighted scores: Saturation={w1*normalized_saturation}, Area={w2*normalized_area}, Centroid Distance={w3*normalized_centroid_distance}")
+
+        # Calculate combined score
+        combined_score = (w1 * normalized_saturation) + \
+                        (w2 * normalized_area) + \
+                        (w3 * normalized_centroid_distance)
+        
+
+        return combined_score
 
     def detect_and_score_regions(self, closed_image, original_image):
         label_img = measure.label(closed_image)
         props = measure.regionprops(label_img)
 
         if len(props) != 2:
-            if len(props) < 2:
-                print("Less than two regions detected, no scoring will be done.")
-                return closed_image
-            else:
-                print("More than two regions detected, only scoring the first two.")
-            return closed_image # unexpected number of regions
+            print(f"Unexpected number of regions detected: {len(props)}")
+            return closed_image
 
         masks = []
         scores = []
         for prop in props:
             mask = (label_img == prop.label).astype(np.uint8) * 255
             masked_image = self.apply_mask(original_image, mask)
-            score = self._calculate_score(masked_image)
+            combined_score = self.calculate_combined_score(masked_image, mask)
+            
+            scores.append(combined_score)
             masks.append(mask)
-            scores.append(score)
-            self.log(f"Score for region with label {prop.label}: {score}")
 
-        # Find the index of the mask with the highest score
-        best_index = np.argmax(scores)
-        print(f"Region {best_index+1} has the highest score: {scores[best_index]}")
-        print(f"Scores: {scores}")
+            print(f"Combined dominance score for region with label {prop.label}: {combined_score}")
 
-        # Return the mask with the highest score
-        return masks[best_index]
 
+        # Checking if the scores are close; if so, consider both regions
+        if False: #abs(scores[0] - scores[1]) < 0.1:  # Threshold to keep both segments if close
+            print(f"Both regions have similar gray dominance. Scores: {scores}")
+            return closed_image
+        else:
+            # Return the mask of the region with higher gray dominance
+            best_index = np.argmax(scores)
+            print(f"Region {best_index+1} has the higher gray dominance score: {scores[best_index]}")
+            return masks[best_index]
+
+    def rectify_mask(self, mask):
+        _, thresh_img = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(thresh_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Compute the bounding rectangle for the largest contour
+        largest_contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(largest_contour)
+
+        #bounding_img = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+        cv2.rectangle(mask, (x, y), (x+w, y+h), (255, 255, 255), -1)
+        return mask
