@@ -93,8 +93,8 @@ def preprocess_for_ocr(image, invert=True):
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
 # Define the directory to walk
-root_dir = 'dataset/timenote/'
-output_dir = 'dataset_preprocessed/timenote/'
+root_dir = 'dataset/timenote/test/'
+output_dir = 'dataset_preprocessed/timenote/test/'
 
 # Walk through the directory
 for dirpath, dirnames, filenames in os.walk(root_dir):
