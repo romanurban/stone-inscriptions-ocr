@@ -179,5 +179,5 @@ class ObjectSelection:
         return color_segmentation, edge_detection
 
 # Example usage (This code is commented out for execution purposes)
-object_selector = ObjectSelection('dataset/preprocessing_test/2016_07_Arija-Dumbravs.jpg')
-object_selector.run()
+#object_selector = ObjectSelection('dataset/preprocessing_test/2016_07_Arija-Dumbravs.jpg')
+#object_selector.run()
