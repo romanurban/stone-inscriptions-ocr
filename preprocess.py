@@ -101,34 +101,35 @@ for dirpath, dirnames, filenames in os.walk(root_dir):
     for filename in filenames:
         # Check if the file is an image
         if filename.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS):
-            # Load the image
             image_path = os.path.join(dirpath, filename)
+            base_filename = os.path.splitext(filename)[0]
+            base_output_dir = dirpath.replace(root_dir, output_dir)
+            os.makedirs(base_output_dir, exist_ok=True)
 
-            # if processed image exists in the output directory, skip it
-            base_path = os.path.splitext(image_path.replace(root_dir, output_dir))[0]
-            if os.path.exists(base_path + '_processed.png'):
+            processed_paths = [
+                os.path.join(base_output_dir, base_filename + '_processed.png'),
+                os.path.join(base_output_dir, base_filename + '_processed_color_segmentation.png'),
+                os.path.join(base_output_dir, base_filename + '_processed_edge_detection.png')
+            ]
+
+            # Skip if all processed files exist
+            if all(os.path.exists(path) for path in processed_paths):
                 print(f"Skipping {image_path}")
                 continue
 
             image = cv2.imread(image_path)
-
-            # Preprocess the image
             processed = preprocess_for_ocr(image, invert=True)
             object_selector = ObjectSelection(image_path, verbose=True)
-            color_segmentation, edge_detection = object_selector.run()
-            color_segmentation = Image.open(color_segmentation)
-            edge_detection = Image.open(edge_detection)
+            color_segmentation_path, edge_detection_path = object_selector.run()
+            color_segmentation = Image.open(color_segmentation_path)
+            edge_detection = Image.open(edge_detection_path)
             processed_color_segmentation = preprocess_for_ocr(color_segmentation, invert=True)
             processed_edge_detection = preprocess_for_ocr(edge_detection, invert=True)
 
             # Save the preprocessed images
-            base_output_dir = dirpath.replace(root_dir, output_dir)
-            os.makedirs(base_output_dir, exist_ok=True)
-
-            base_filename = os.path.splitext(filename)[0]
-            cv2.imwrite(os.path.join(base_output_dir, base_filename + '_processed.png'), processed)
-            cv2.imwrite(os.path.join(base_output_dir, base_filename + '_processed_color_segmentation.png'), processed_color_segmentation)
-            cv2.imwrite(os.path.join(base_output_dir, base_filename + '_processed_edge_detection.png'), processed_edge_detection)
+            cv2.imwrite(processed_paths[0], processed)
+            cv2.imwrite(processed_paths[1], processed_color_segmentation)
+            cv2.imwrite(processed_paths[2], processed_edge_detection)
 
 # tesseract = TesseractOCR()
 # google_vision = GoogleVisionOCR()
