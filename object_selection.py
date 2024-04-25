@@ -27,11 +27,11 @@ class ObjectSelection:
     def setup_helper(self):
         self.helper = ObjectSelectionHelper(verbose=self.verbose)
 
-    def apply_color_overlay(self, image, color='blue', alpha=0.5):
+    def apply_color_overlay(self, image, color='red'):
         # Define the color values
         color_values = {
             'blue': [255, 0, 0],  # Blue color in BGR
-            'pink': [255, 105, 180]  # Pink color in BGR
+            'red': [0, 0, 255]  # Red color in BGR
         }
 
         # Get the color value from the color name
@@ -43,10 +43,36 @@ class ObjectSelection:
         # Create a 3D mask with the specified color where the original mask is white
         overlay = np.zeros((*image.shape, 4), dtype=np.uint8)  # 4th channel for Alpha
         overlay[image == 255, :3] = color
-        overlay[image == 255, 3] = 255 * alpha  # Apply alpha to the 4th channel
-
 
         return overlay
+    
+    def overlay_region(self, top_regions, picked_region):
+        # Convert top_regions to BGR if it's not already
+        if len(top_regions.shape) == 2 or top_regions.shape[2] == 1:
+            top_regions_color = cv2.cvtColor(top_regions, cv2.COLOR_GRAY2BGR)
+        else:
+            top_regions_color = top_regions.copy()
+
+        # Ensure picked_region is binary
+        picked_region_binary = (picked_region > 0).astype(np.uint8)
+
+        # Create the kernel for dilation
+        kernel = np.ones((6,6), np.uint8)
+
+        # Dilate the picked_region to get the outline
+        dilated_region = cv2.dilate(picked_region_binary, kernel, iterations=1)
+
+        # Subtract the picked_region from the dilated_region to get the outline
+        outline = dilated_region - picked_region_binary
+
+        # Debug: Check if the outline has any non-zero values
+        if np.count_nonzero(outline) == 0:
+            print("No outline detected. Check the picked_region array and dilation process.")
+
+        # Apply the outline to the top_regions_color
+        top_regions_color[outline == 1] = [0, 255, 0]  # BGR for red in OpenCV
+
+        return top_regions_color
     
     def process_image(self, method='color_segmentation'):
         images = {'original': cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)}
@@ -54,32 +80,35 @@ class ObjectSelection:
         if method == 'color_segmentation':
             threshold = self.helper.color_segmentation_lab(self.image)
             suffix = '_color_segmentation'
+            images['thresholded'] = threshold
+            top_regions = self.helper.retain_top_regions_thresholded(threshold)
+            eroded_image = self.helper.erode_until_max_area(top_regions)
+            dilated_image = self.helper.dilate_image(eroded_image)
+            images['top_regions tresholded & dilated'] = dilated_image
+            picked_region = self.helper.detect_and_score_regions(dilated_image, self.image)
+            overlayed = self.overlay_region(dilated_image, picked_region)
         elif method == 'edge_detection':
             threshold = self.helper.detect_and_invert_edges(self.image)
             suffix = '_edge_detection'
+            images['thresholded'] = threshold
+            eroded_image = self.helper.erode_until_max_area(threshold)
+            dilated_image = self.helper.dilate_image(eroded_image)
+            images['eroded & dilated'] = dilated_image
+            top_regions = self.helper.retain_top_regions_thresholded(dilated_image)
+            picked_region = self.helper.detect_and_score_regions(top_regions, self.image)
+            overlayed = self.overlay_region(top_regions, picked_region)
 
-        images['thresholded'] = threshold
-        eroded_image = self.helper.erode_until_max_area(threshold)
-        images['eroded'] = eroded_image
-        top_regions = self.helper.retain_top_regions_thresholded(eroded_image)
-        
-        picked_region = self.helper.detect_and_score_regions(top_regions, self.image)
-        overlayed_picked_region = self.apply_color_overlay(picked_region, color='blue')
-        # Convert picked_region to a 3-channel image
-        picked_region_color = cv2.cvtColor(picked_region, cv2.COLOR_GRAY2BGRA)
-        hl_picked_region = cv2.addWeighted(overlayed_picked_region, 0.5, picked_region_color, 0.5, 0)
-        # todo figure out how to display both images
-        images['best_candidate_regions'] = hl_picked_region
-        
+        images['best_candidate_regions'] = overlayed
+
         closed_image = self.helper.perform_morphological_closing(picked_region)
-        images['morphologically_closed'] = closed_image
-
         # make mask rectangular shape
         rect_mask = self.helper.rectify_mask(picked_region)
-        # todo paint the mask other color and display over the mask
+        overlayed_rect = self.overlay_region(closed_image, rect_mask)
+
+        images['morphologically_closed'] = overlayed_rect
 
         masked_image = self.helper.apply_mask(self.image, rect_mask)
-        images['masked'] = cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB)
+        images['rectangular_mask'] = cv2.cvtColor(masked_image, cv2.COLOR_BGR2RGB)
 
         self.visualize_and_save(images, suffix + '_steps.png')
         output_path = self.save_final_masked_image(masked_image, suffix + '.png')
@@ -149,6 +178,6 @@ class ObjectSelection:
 
         return color_segmentation, edge_detection
 
-# Example usage (This code is commented out for execution purposes):
-object_selector = ObjectSelection('dataset/preprocessing_test/2018_08_Antonina-Fedcenko.jpg')
+# Example usage (This code is commented out for execution purposes)
+object_selector = ObjectSelection('dataset/preprocessing_test/2016_07_Arija-Dumbravs.jpg')
 object_selector.run()

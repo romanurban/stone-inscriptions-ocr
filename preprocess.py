@@ -93,8 +93,8 @@ def preprocess_for_ocr(image, invert=True):
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
 # Define the directory to walk
-root_dir = 'dataset/preprocessing_test/'
-output_dir = 'dataset_preprocessed/preprocessing_test/'
+root_dir = 'dataset/timenote/Jaunciema_kapi/'
+output_dir = 'dataset_preprocessed/timenote/Jaunciema_kapi/'
 
 # Walk through the directory
 for dirpath, dirnames, filenames in os.walk(root_dir):
@@ -103,6 +103,13 @@ for dirpath, dirnames, filenames in os.walk(root_dir):
         if filename.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS):
             # Load the image
             image_path = os.path.join(dirpath, filename)
+
+            # if processed image exists in the output directory, skip it
+            base_path = os.path.splitext(image_path.replace(root_dir, output_dir))[0]
+            if os.path.exists(base_path + '_processed.png'):
+                print(f"Skipping {image_path}")
+                continue
+
             image = cv2.imread(image_path)
 
             # Preprocess the image

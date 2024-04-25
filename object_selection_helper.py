@@ -11,6 +11,24 @@ class ObjectSelectionHelper:
         if self.verbose:
             print(message)
 
+    def dilate_image(self, image, kernel_size=(2, 2), iterations=3):
+        # Check if image is already a single-channel image
+        if len(image.shape) == 2 or image.shape[2] == 1:
+            dilation = image  # Use the image as is if it is already one channel
+            self.log("Image is already in single-channel format.")
+        else:
+            # Convert the image to grayscale if it has more than one channel
+            dilation = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            self.log("Converted image to grayscale.")
+
+        # Create the kernel for dilation
+        kernel = np.ones(kernel_size, np.uint8)
+
+        # Perform the dilation operation
+        dilation = cv2.dilate(dilation, kernel, iterations=iterations)
+
+        return dilation
+
     def perform_morphological_closing(self, image):
         # Check if image is already a single-channel image
         if len(image.shape) == 2 or image.shape[2] == 1:
@@ -23,7 +41,7 @@ class ObjectSelectionHelper:
 
         # Constants for the morphological operations
         kernel_size = (3, 3)
-        max_iterations = 30
+        max_iterations = 10
         stop_threshold = 5000
         kernel = np.ones(kernel_size, np.uint8)
 
@@ -90,16 +108,21 @@ class ObjectSelectionHelper:
         while iterations <= 20:
             eroded = cv2.erode(image, kernel, iterations=iterations)
 
-            # Label connected components in the eroded image
-            label_img = measure.label(eroded)
-            props = measure.regionprops(label_img)
+            try:
+                # Label connected components in the eroded image
+                label_img = measure.label(eroded)
+                props = measure.regionprops(label_img)
 
-            # Sort the regions by area
-            props_sorted = sorted(props, key=lambda prop: prop.area, reverse=True)
+                # Sort the regions by area
+                props_sorted = sorted(props, key=lambda prop: prop.area, reverse=True)
 
-            # Check if the largest area is less than max_area
-            if props_sorted[0].area < max_area:
-                break
+                # Check if the largest area is less than max_area
+                if props_sorted[0].area < max_area:
+                    break
+            except IndexError:
+                # If IndexError occurs, log the error and return the original image
+                self.log(f"IndexError occurred at iteration {iterations}. Returning the original image.")
+                return image
 
             # Increase the number of iterations for the next erosion
             iterations += 1
@@ -218,9 +241,9 @@ class ObjectSelectionHelper:
         label_img = measure.label(closed_image)
         props = measure.regionprops(label_img)
 
-        if len(props) != 2:
-            print(f"Unexpected number of regions detected: {len(props)}")
-            return closed_image
+        # If there are more than two regions, take the top two by area
+        if len(props) > 2:
+            props = sorted(props, key=lambda x: x.area, reverse=True)[:2]
 
         masks = []
         scores = []
@@ -234,24 +257,32 @@ class ObjectSelectionHelper:
 
             print(f"Combined dominance score for region with label {prop.label}: {combined_score}")
 
-
-        # Checking if the scores are close; if so, consider both regions
-        if False: #abs(scores[0] - scores[1]) < 0.1:  # Threshold to keep both segments if close
-            print(f"Both regions have similar gray dominance. Scores: {scores}")
-            return closed_image
-        else:
-            # Return the mask of the region with higher gray dominance
+        # In case there were only two regions to start with, we can compare their scores
+        if len(scores) == 2:
+            # Return the mask of the region with the higher dominance score
             best_index = np.argmax(scores)
-            print(f"Region {best_index+1} has the higher gray dominance score: {scores[best_index]}")
+            print(f"Region {best_index+1} has the higher dominance score: {scores[best_index]}")
             return masks[best_index]
+        elif len(scores) == 1:
+            # If there was only one region, return its mask
+            print(f"Only one region detected with score: {scores[0]}")
+            return masks[0]
+        else:
+            # No regions detected or no regions after filtering
+            print("No regions to process after filtering by area.")
+            return closed_image
 
     def rectify_mask(self, mask):
         _, thresh_img = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(thresh_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # Compute the bounding rectangle for the largest contour
-        largest_contour = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(largest_contour)
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
+            x, y, w, h = cv2.boundingRect(largest_contour)
 
-        #bounding_img = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-        cv2.rectangle(mask, (x, y), (x+w, y+h), (255, 255, 255), -1)
-        return mask
+            #bounding_img = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            cv2.rectangle(mask, (x, y), (x+w, y+h), (255, 255, 255), -1)
+            return mask
+        else:
+            print("No contours found.")
+            return mask
