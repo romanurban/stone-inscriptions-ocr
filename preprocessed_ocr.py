@@ -17,7 +17,7 @@ def process_directory(directory):
     print("-" * 60)
     google_vision_ocr = GoogleVisionOCR()
     tesseract_ocr = TesseractOCR()
-    apple_vision_ocr = AppleVisionOCR('ocr_results/apple_vision_source_init')
+    apple_vision_ocr = AppleVisionOCR('ocr_results/apple_vision_source_preprocess')
     score_service = ScoreService(REVISION)  # Set a base directory for scores
 
     for root, dirs, files in os.walk(directory):
@@ -52,19 +52,19 @@ def process_directory(directory):
 
                     ocr_text = tesseract_ocr.run_ocr(processed_image_path, lang)
                     google_vision_ocr_text = google_vision_ocr.perform_ocr(processed_image_path)
-                    #apple_vision_ocr_text = apple_vision_ocr.perform_ocr(processed_image_path)
+                    apple_vision_ocr_text = apple_vision_ocr.perform_ocr(processed_image_path)
 
                     print(f"  > Tesseract OCR text: {ocr_text if ocr_text else '[No text detected]'}")
                     print(f"  > Google Vision OCR text: {google_vision_ocr_text if google_vision_ocr_text else '[No text detected]'}")
-                    #print(f"  > Apple Vision OCR text: {apple_vision_ocr_text if apple_vision_ocr_text else '[No text detected]'}")
+                    print(f"  > Apple Vision OCR text: {apple_vision_ocr_text if apple_vision_ocr_text else '[No text detected]'}")
 
                     score_service.process_scores(processed_image_path, "Tesseract", true_text, ocr_text)
                     score_service.process_scores(processed_image_path, "Google Vision", true_text, google_vision_ocr_text)
-                   # score_service.process_scores(processed_image_path, "Apple Vision", true_text, apple_vision_ocr_text)
+                    score_service.process_scores(processed_image_path, "Apple Vision", true_text, apple_vision_ocr_text)
 
     print("-" * 60)
     print("Directory processing completed.")
 
 if __name__ == "__main__":
-    dataset_directory = "dataset/timenote/test/"
+    dataset_directory = "dataset/berlin-mitte/"
     process_directory(dataset_directory)

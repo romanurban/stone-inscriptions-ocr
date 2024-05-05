@@ -37,21 +37,21 @@ def process_directory(directory):
                 else:
                     print(f"  > No JSON details found for {file}")
 
-                #ocr_text = tesseract_ocr.run_ocr(image_path, lang)
-                #google_vision_ocr_text = google_vision_ocr.perform_ocr(image_path)
+                ocr_text = tesseract_ocr.run_ocr(image_path, lang)
+                google_vision_ocr_text = google_vision_ocr.perform_ocr(image_path)
                 apple_vision_ocr_text = apple_vision_ocr.perform_ocr(image_path)
 
-                #print(f"  > Tesseract OCR text: {ocr_text if ocr_text else '[No text detected]'}")
-                #print(f"  > Google Vision OCR text: {google_vision_ocr_text if google_vision_ocr_text else '[No text detected]'}")
+                print(f"  > Tesseract OCR text: {ocr_text if ocr_text else '[No text detected]'}")
+                print(f"  > Google Vision OCR text: {google_vision_ocr_text if google_vision_ocr_text else '[No text detected]'}")
                 print(f"  > Apple Vision OCR text: {apple_vision_ocr_text if apple_vision_ocr_text else '[No text detected]'}")
 
-                #score_service.process_scores(image_path, "Tesseract", true_text, ocr_text)
-                #score_service.process_scores(image_path, "Google Vision", true_text, google_vision_ocr_text)
+                score_service.process_scores(image_path, "Tesseract", true_text, ocr_text)
+                score_service.process_scores(image_path, "Google Vision", true_text, google_vision_ocr_text)
                 score_service.process_scores(image_path, "Apple Vision", true_text, apple_vision_ocr_text)
 
     print("-" * 60)
     print("Directory processing completed.")
 
 if __name__ == "__main__":
-    dataset_directory = "dataset/timenote/"
+    dataset_directory = "dataset/"
     process_directory(dataset_directory)

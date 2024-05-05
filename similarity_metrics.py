@@ -24,7 +24,6 @@ def normalize_text(text, strip_whitespace=False):
     return normalized
 
 # word level similarity metrics
-
 def basic_similarity_score(ocr_text, true_text):
     """
     Compares OCR text with true text in a naive way by checking the proportion
