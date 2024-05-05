@@ -1,64 +1,18 @@
 import pandas as pd
 import os
 import json
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-def extract_features(df):
-    preprocessed_pattern = '(_processed.png|_processed_color_segmentation.png|_processed_edge_detection.png)'
-    dataset_type_pattern = '(timenote|berlin-mitte)'
-
-    # Extract the postprocessing method
-    df['preprocessed_method'] = df['file_id_preprocessed'].str.extract(preprocessed_pattern, expand=False)
-
-    # Extract the dataset type
-    df['dataset_type'] = df['file_id_init'].str.extract(dataset_type_pattern, expand=False)
-
-    return df
-
-def get_unrecognized_file_keys(df):
-    # create column that indicates that both init and preprocessed runs did not recognize anything
-    df['nothing_recognized'] = (df['composite_score_init'] == 0.0) & (df['composite_score_preprocessed'] == 0.0)
-   
-    print(df.info())
-    # those where for all filey_key entries nothing was recognized
-    unrecognized = df.groupby('file_key')['nothing_recognized'].all()
-
-    return pd.DataFrame(unrecognized[unrecognized].index, columns=['file_key'])
-
-def convert_column_types(df):
-    # List of columns to convert to float
-    float_columns = [
-        'composite_score',
-        'scores.basic_similarity_score',
-        'scores.lcs_similarity_score',
-        'scores.jaro_winkler_similarity',
-        'scores.difflib_similarity'
-    ]
-    
-    # Convert each column to float
-    for column in float_columns:
-        df[column] = df[column].astype(float)
-    
-    return df
-
-def extract_orig_file_id(df):
-    # Define the postfixes to remove
-    postfixes = [
-        '_processed.png',
-        '_processed_color_segmentation.png',
-        '_processed_edge_detection.png'
-    ]
-    
-    # Create a new column 'file_key' by replacing postfixes in 'file_id'
-    df['file_key'] = df['file_id']
-    for postfix in postfixes:
-        df['file_key'] = df['file_key'].str.replace(postfix, '', regex=False).str.replace('dataset_preprocessed', 'dataset', regex=False)
-    
-    return df
-
+# Function to read JSON files into a pandas DataFrame
 def read_jsons_to_dataframe(directory):
     df = pd.DataFrame()
 
     for root, dirs, files in os.walk(directory):
+        # ignore test subdirectory
+        if 'test' in root:
+            continue
+
         for filename in files:
             if filename.endswith('.json'):
                 file_path = os.path.join(root, filename)
@@ -83,73 +37,158 @@ def read_jsons_to_dataframe(directory):
 
     return df
 
+# Function to convert column types for specific score-related columns
+def convert_column_types(df):
+    float_columns = [
+        'composite_score',
+        'scores.basic_similarity_score',
+        'scores.lcs_similarity_score',
+        'scores.jaro_winkler_similarity',
+        'scores.difflib_similarity'
+    ]
+    for column in float_columns:
+        df[column] = df[column].astype(float)
+    return df
+
+def extract_features(df):
+    dataset_type_pattern = '(timenote|berlin-mitte)'
+
+    # Extract the dataset type
+    df['dataset_type'] = df['file_id'].str.extract(dataset_type_pattern, expand=False)
+
+    return df
+
+def extract_features_preproc(df):
+    preprocessed_pattern = '(_processed.png|_processed_color_segmentation.png|_processed_edge_detection.png)'
+    dataset_type_pattern = '(timenote|berlin-mitte)'
+
+    # Extract the postprocessing method
+    df['preprocessed_method'] = df['file_id'].str.extract(preprocessed_pattern, expand=False)
+    df.loc[df['preprocessed_method'] == '_processed_edge_detection.png', 'preprocessed_method'] = 'edge_detection'
+    df.loc[df['preprocessed_method'] == '_processed_color_segmentation.png', 'preprocessed_method'] = 'color_segmentation'
+    df.loc[df['preprocessed_method'] == '_processed.png', 'preprocessed_method'] = 'default'
+
+    # Extract the dataset type
+    df['dataset_type'] = df['file_id'].str.extract(dataset_type_pattern, expand=False)
+
+    return df
+
+def extract_orig_file_id(df):
+    # Define the postfixes to remove
+    postfixes = [
+        '_processed.png',
+        '_processed_color_segmentation.png',
+        '_processed_edge_detection.png'
+    ]
+    
+    # Create a new column 'file_key' by replacing postfixes in 'file_id'
+    df['file_key'] = df['file_id']
+    for postfix in postfixes:
+        df['file_key'] = df['file_key'].str.replace(postfix, '', regex=False).str.replace('dataset_preprocessed', 'dataset', regex=False)
+    
+    return df
+
+def plot_preprocessing_effects(df, ocr_methods):
+    # Set the style of seaborn for better visuals
+    sns.set(style="whitegrid")
+
+    # Loop through each OCR method and create a separate plot
+    for ocr_method in ocr_methods:
+        # Filter data for the current OCR method
+        data = df[df['ocr_method'] == ocr_method]
+        
+        plt.figure(figsize=(10, 6))
+        # Create a boxplot
+        sns.boxplot(x='preprocessed_method', y='composite_score', hue='dataset_type', data=data, palette='Set3')
+        plt.title(f'Composite Score Distribution by Preprocessing Method for {ocr_method}')
+        plt.xlabel('Preprocessing Method')
+        plt.ylabel('Composite Score')
+        plt.legend(title='Dataset Type')
+        plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
+        plt.show()
+
 df_init = read_jsons_to_dataframe('ocr_results/revision_INITIAL_complete/')
-print("Initial dataframe shape: ", df_init.shape)
-print(df_init.head())
-print(df_init.info())
+df_init = convert_column_types(df_init)
+df_init = extract_features(df_init)
+# print("Initial dataframe shape: ", df_init.shape)
+
+# check and convert data type of 'composite_score' to float if not already
+if df_init['composite_score'].dtype != 'float':
+    df_init['composite_score'] = pd.to_numeric(df_init['composite_score'], errors='coerce')
+
+# check for NaN values and handle them
+if df_init['composite_score'].isna().any():
+    print("NaN values found in 'composite_score'. Filling with median...")
+    median_value = df_init['composite_score'].median()
+    df_init['composite_score'].fillna(median_value, inplace=True)
+
+# print("DataFrame shape: ", df_init.shape)
+# print(df_init.describe())
+
+# analyzing the effectiveness of each OCR method
+grouped = df_init.groupby(['ocr_method', 'dataset_type']).agg({
+    'composite_score': ['mean', 'std', 'min', 'max', 'count']
+})
 
 df_preprocessed = read_jsons_to_dataframe('ocr_results/revision_PREPROCESSED_complete/')
-print("Preprocessed dataframe shape: ", df_preprocessed.shape)
-print(df_preprocessed.head())
-print(df_preprocessed.info())
-
-print("Converting column types...")
-df_init = convert_column_types(df_init)
 df_preprocessed = convert_column_types(df_preprocessed)
-print(df_init.info())
-print(df_preprocessed.info())
-
-print("Create file key to merge data frames")
-df_init['file_key'] = df_init['file_id'].str.replace(r'\.[^.]+$','', regex=True) # drop the extension
-print(df_init[['file_id', 'file_key']].head(10))
-
-print("Extract original file key from preprocessed data frame")
+df_preprocessed = extract_features_preproc(df_preprocessed)
 df_preprocessed = extract_orig_file_id(df_preprocessed)
-# pd.set_option('display.max_colwidth', None)
-print(df_preprocessed[['file_id', 'file_key']].head(10))
 
-# print("Key value counts:")
-# print("INIT: ", df_init['file_key'].value_counts())
-# print("PREPROCESSED: ", df_preprocessed['file_key'].value_counts())
+# detecting best performeing preprocessing method
+method_priority = {'color_segmentation': 1, 'edge_detection': 2, 'default': 3}
+df_preprocessed['method_priority'] = df_preprocessed['preprocessed_method'].map(method_priority)
+df_sorted = df_preprocessed.sort_values(by=['file_key', 'ocr_method', 'composite_score', 'method_priority'], ascending=[True, True, False, True])
 
-df_combined = pd.merge(df_init, df_preprocessed, on=['file_key', 'ocr_method'], how='inner', suffixes=('_init', '_preprocessed'))
-print("Combined dataframe shape: ", df_combined.shape)
-print(df_combined.info())
+# select the index of the first entry after sorting
+idx = df_sorted.groupby(['file_key', 'ocr_method']).head(1).index
 
-# print all columns to see what we have for file_key dataset/timenote/Tornakalna_kapi/2016_05_Numa-Palmgrens
-print(df_combined[df_combined['file_key'] == 'dataset/timenote/Tornakalna_kapi/2016_05_Numa-Palmgrens'])
+# use  indices to find the best performing preprocessed_method for each group
+best_preprocessing = df_sorted.loc[idx].reset_index(drop=True)
 
-unrecognized = get_unrecognized_file_keys(df_combined)
-pd.set_option('display.max_colwidth', None)
-pd.set_option('display.max_rows', None)
-print(unrecognized)
+# Drop the auxiliary column
+best_preprocessing = best_preprocessing.drop(columns=['method_priority'])
 
-# filter out those, that perfectly recognized from the initial run
-# TODO count how many of these are there, mention in report, which method achieved that comparing to others
-df_combined = df_combined[df_combined['composite_score_init'] != 1.0]
+print("Overal value stats on dominating -", best_preprocessing['preprocessed_method'].value_counts())
 
-# filter out those, that were not recognized by any method
-df_combined = df_combined[~df_combined['file_key'].isin(unrecognized['file_key'])]
+# for the init_df we need to ad preprocessed_method - none
+df_init['preprocessed_method'] = 'none'
 
-# calculate the difference between the composite scores
-df_combined['score_improvement'] = df_combined['composite_score_preprocessed'] - df_combined['composite_score_init']
+# for df_init add 'file_key' column that is the same as 'file_id' but without the file extension
+df_init['file_key'] = df_init['file_id'].str.replace(r'\.[^.]+$','', regex=True) # drop the extension
 
-# extract more features
-df_combined = extract_features(df_combined)
+# assuming the same structure of both datasets
+df_combined = df_init._append(best_preprocessing, ignore_index=True)
 
-print(df_combined.info())
+def filter_groups(group):
+    return group['composite_score'].max() > 0.05
 
-df_sorted = df_combined.sort_values(by='score_improvement', ascending=False)
+print("Before unrecognizable cleaned: ", df_combined.shape)
+df_combined = df_combined.groupby(['file_key']).filter(filter_groups)
+print("After unrecognizable cleaned: ", df_combined.shape)
 
-top_100 = df_sorted.head(4000)
-pd.set_option('display.max_colwidth', None)
-pd.set_option('display.max_rows', None)
-#print(top_100[['file_key', 'ocr_method', 'score_improvement','composite_score_preprocessed']])
+# creating baseline score column for further comparison
+df_combined = df_combined.merge(df_init[['file_key', 'ocr_method', 'composite_score']],
+                                on=['file_key', 'ocr_method'],
+                                suffixes=('', '_baseline'))
 
-# TODO separately analyze method comparison performance
-# and main dataset recognition stats like how many recognized, how many not, how many were improved
+def exclude_worsened_groups(group):
+    # Condition 1: No score should be less than the baseline
+    # Condition 2: At least one score should be greater than the baseline (indicating improvement)
+    has_worsened = (group['composite_score'] < group['composite_score_baseline']).any()
+    has_improved = (group['composite_score'] > group['composite_score_baseline']).any()
+    return not has_worsened and has_improved
 
-# how many images had OCR improvement
-print("Improved OCR: ", df_combined[df_combined['score_improvement'] > 0].shape[0])
-print("Total images: ", df_combined.shape[0])
+df_combined = df_combined.groupby(['file_key']).filter(exclude_worsened_groups)
+print("After worsened preprocessing ignored: ", df_combined.shape)
+
+grouped_combined = df_combined.groupby(['ocr_method', 'dataset_type', 'preprocessed_method']).agg({
+    'composite_score': ['mean', 'std', 'min', 'max', 'count']
+})
+
+print(grouped_combined)
+
+#build boxplots
+ocr_methods = df_combined['ocr_method'].unique()
+plot_preprocessing_effects(df_combined, ocr_methods)
 
