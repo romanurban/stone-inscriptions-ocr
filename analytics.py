@@ -99,12 +99,11 @@ def plot_preprocessing_effects(df, ocr_methods):
         
         plt.figure(figsize=(10, 6))
         # Create a boxplot
-        sns.boxplot(x='preprocessed_method', y='composite_score', hue='dataset_type', data=data, palette='Set3')
-        plt.title(f'Composite Score Distribution by Preprocessing Method for {ocr_method}')
-        plt.xlabel('Preprocessing Method')
-        plt.ylabel('Composite Score')
-        plt.legend(title='Dataset Type')
-        plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
+        sns.boxplot(x='preprocessed_method', y='composite_score', hue='dataset_type', data=data, palette='Set2')
+        plt.title(f'Precizitātes novērtējuma sadalījums priekš OCR metodes {ocr_method}')
+        plt.xlabel('Priekšapstrādes metodes')
+        plt.ylabel('Precizitātes novertejums', labelpad=20)
+        plt.legend(title='Datu kopas veids', bbox_to_anchor=(1, 1), loc=2, borderaxespad=0.)
         plt.show()
 
 df_init = read_jsons_to_dataframe('ocr_results/revision_INITIAL_complete/')
@@ -192,3 +191,54 @@ print(grouped_combined)
 ocr_methods = df_combined['ocr_method'].unique()
 plot_preprocessing_effects(df_combined, ocr_methods)
 
+df_combined['score_diff'] = df_combined['composite_score'] - df_combined['composite_score_baseline']
+# group by file_key and ocr_method and get max score_diff
+df_max_diff = df_combined.groupby(['file_key', 'ocr_method']).agg({
+    'score_diff': 'max'
+}).reset_index()
+
+# plot the max differences average by ocr_method using a bar plot
+plt.figure(figsize=(10, 6))
+sns.barplot(x='ocr_method', y='score_diff', data=df_max_diff, palette='Set3')
+plt.title('Vidējais precizitātes uzlabojums')
+plt.xlabel('OCR Metode')
+plt.ylabel('Uzlabojuma vidējais novērtējums')
+plt.show()
+
+df_max_diff = df_combined.groupby(['file_key', 'preprocessed_method']).agg({
+    'score_diff': 'max'
+}).reset_index()
+
+# exclude none method
+df_max_diff = df_max_diff[df_max_diff['preprocessed_method'] != 'none']
+
+# plot the max differences average by ocr_method using a bar plot
+plt.figure(figsize=(10, 6))
+sns.barplot(x='preprocessed_method', y='score_diff', data=df_max_diff, palette='Set1')
+plt.title('Vidējais precizitātes uzlabojums')
+plt.xlabel('Priekšapstrādes metode')
+plt.ylabel('Uzlabojuma vidējais novērtējums')
+plt.show()
+
+# Filter for rows where 'composite_score' is above 0.05
+df_filtered = df_combined[df_combined['composite_score'] > 0.05]
+
+# Count the number of images recognized initially by each OCR method
+initial_counts = df_filtered[df_filtered['preprocessed_method'] == 'none'].groupby('ocr_method')['file_key'].count()
+
+# Count the number of images recognized initially by each OCR method
+preprocessed_counts = df_filtered[df_filtered['preprocessed_method'] != 'none'].groupby('ocr_method')['file_key'].count()
+
+# Combine the counts into a single DataFrame
+counts = pd.DataFrame({'Initial': initial_counts, 'Preprocessed': preprocessed_counts})
+counts['Preprocessed'] = counts['Preprocessed'] - counts['Initial']
+
+# Plot the counts
+colors = ['#254d70', '#b2d942']
+counts.plot(kind='bar', stacked=True, color=colors, figsize=(10, 6))
+plt.title('Atpazītu attēlu skaits pēc OCR metodes')
+plt.xlabel('')
+plt.ylabel('Attēlu skaits')
+plt.legend(['Sakotnēji', 'Ar priekšapstrādi'])
+plt.xticks(rotation=0)
+plt.show()
